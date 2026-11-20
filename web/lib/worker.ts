@@ -57,3 +57,10 @@ export function signedFileUrl(base: string, jobId: string, rel: string, download
 export function passcodeToken(passcode: string) {
   return crypto.createHmac("sha256", SECRET).update(`passcode:${passcode}`).digest("hex");
 }
+
+/** Short-lived token that lets the browser upload videos straight to the worker. */
+export function uploadToken(ttlSeconds = 3 * 3600) {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const sig = crypto.createHmac("sha256", SECRET).update(`upload:${exp}`).digest("hex");
+  return `${exp}.${sig}`;
+}

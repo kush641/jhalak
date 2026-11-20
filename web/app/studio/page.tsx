@@ -11,6 +11,9 @@ type JobRow = { id: string; status: string; stage: string; progress: number; cre
 export default function Studio() {
   const router = useRouter();
   const [drive, setDrive] = useState("");
+  const [source, setSource] = useState<"drive" | "upload">("drive");
+  const [files, setFiles] = useState<File[]>([]);
+  const [upMsg, setUpMsg] = useState("");
   const [series, setSeries] = useState("");
   const [range, setRange] = useState("1-10");
   const [epLang, setEpLang] = useState("unknown");
@@ -27,15 +30,49 @@ export default function Studio() {
     fetch("/api/jobs").then(async (r) => (r.ok ? setJobs(await r.json()) : null)).catch(() => null);
   }, []);
 
+    // Browser -> worker upload in 16 MB pieces (Vercel can't take big bodies; tunnels cap request size).
+  async function uploadAll(): Promise<string> {
+    const tk = await fetch("/api/upload-token").then((r) => r.json());
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    const CH = 16 * 1024 * 1024;
+    const total = files.reduce((a, f) => a + f.size, 0);
+    let sent = 0;
+    for (const f of files) {
+      for (let off = 0; off < Math.max(f.size, 1); off += CH) {
+        const blob = f.slice(off, off + CH);
+        let ok = false, lastErr = "";
+        for (let t = 0; t < 3 && !ok; t++) {
+          try {
+            const r = await fetch(`${tk.url}/uploads/${id}?name=${encodeURIComponent(f.name)}&offset=${off}`, {
+              method: "PUT", headers: { "X-Upload-Token": tk.token }, body: blob,
+            });
+            ok = r.ok;
+            if (!ok) lastErr = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+          } catch { lastErr = "could not reach the worker (is it running, and is the worker URL current?)"; }
+        }
+        if (!ok) throw new Error(`Upload of ${f.name} failed: ${lastErr}`);
+        sent += blob.size;
+        setUpMsg(`Uploading ${f.name} · ${Math.round((100 * sent) / total)}%`);
+      }
+    }
+    setUpMsg("");
+    return id;
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr("");
+    let uploadId: string | undefined;
+    if (source === "upload") {
+      if (!files.length) { setBusy(false); return setErr("Choose at least one video file"); }
+      try { uploadId = await uploadAll(); } catch (ex) { setBusy(false); setUpMsg(""); return setErr((ex as Error).message); }
+    }
     const r = await fetch("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        drive_url: drive.trim(), series_name: series, episode_range: range, language: epLang,
+        drive_url: source === "drive" ? drive.trim() : undefined, upload_id: uploadId, series_name: series, episode_range: range, language: epLang,
         narration_language: narrLang, narrator_voice: voice, target_seconds: seconds, global_prompt: direction, promos,
       }),
     });
@@ -65,8 +102,24 @@ export default function Studio() {
               <h2 className="font-semibold">1 · Episodes</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_160px]">
                 <div>
-                  <label className="label">Google Drive folder link (shared as &ldquo;anyone with the link&rdquo;)</label>
-                  <input className="input" required value={drive} onChange={(e) => setDrive(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
+                  <div className="mb-2 flex gap-2">
+                    {([["drive", "Google Drive link"], ["upload", "Upload from my computer"]] as const).map(([k, v]) => (
+                      <button type="button" key={k} onClick={() => setSource(k)} className={`rounded-lg border px-3 py-1.5 text-xs ${source === k ? "grad-border text-white" : "border-white/10 text-white/60"}`}>{v}</button>
+                    ))}
+                  </div>
+                  {source === "drive" ? (
+                    <>
+                      <label className="label">Google Drive folder link (shared as &ldquo;anyone with the link&rdquo;)</label>
+                      <input className="input" required value={drive} onChange={(e) => setDrive(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
+                    </>
+                  ) : (
+                    <>
+                      <label className="label">Episode videos (named so they sort in order, e.g. ep01.mp4, ep02.mp4)</label>
+                      <input className="input" type="file" multiple accept="video/*,.mkv,.mov,.mp4" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+                      {files.length > 0 && <p className="mt-2 text-xs text-white/45">{files.length} file(s) · {(files.reduce((a, f) => a + f.size, 0) / 1e6).toFixed(0)} MB</p>}
+                      {upMsg && <p className="mt-2 text-xs text-white/70">{upMsg}</p>}
+                    </>
+                  )}
                 </div>
                 <div>
                   <label className="label">Episodes to use</label>

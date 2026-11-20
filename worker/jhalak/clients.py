@@ -146,9 +146,20 @@ def _chat(base_url: str, api_key: str, model: str, messages: list, max_tokens: i
     )
     body = r.json()
     try:
-        return body["choices"][0]["message"]["content"] or ""
-    except (KeyError, IndexError) as e:
+        choice = body["choices"][0]
+        msg = choice["message"]
+    except (KeyError, IndexError, TypeError) as e:
         raise APIError(f"unexpected chat response: {str(body)[:300]}") from e
+    text = msg.get("content") or ""
+    if not text.strip():
+        # Reasoning models can spend the whole budget thinking and leave `content` empty.
+        text = msg.get("reasoning_content") or msg.get("reasoning") or ""
+    global LAST_FINISH_REASON
+    LAST_FINISH_REASON = choice.get("finish_reason")
+    return text
+
+
+LAST_FINISH_REASON = None
 
 
 def vision_json(system: str, prompt: str, image_paths: list[Path], max_tokens: int = 1500, mock_ctx: dict | None = None) -> dict:
@@ -182,14 +193,19 @@ def text_json(system: str, prompt: str, max_tokens: int = 6000, temperature: flo
     messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
     extra = {"reasoning_effort": "low"} if model.startswith("sarvam-105b") else None
     last_err = None
-    for _ in range(3):
-        text = _chat(settings.SCRIPT_BASE_URL, settings.SARVAM_API_KEY, model, messages, max_tokens, temperature, extra)
+    budget = max_tokens
+    for attempt in range(4):
+        text = _chat(settings.SCRIPT_BASE_URL, settings.SARVAM_API_KEY, model, messages, budget, temperature, extra)
+        print(f"[script-model] attempt={attempt} finish={LAST_FINISH_REASON} chars={len(text)} head={text[:160]!r}", flush=True)
         try:
             return extract_json(text)
         except (ValueError, json.JSONDecodeError) as e:
-            last_err = e
+            last_err = f"{e} (finish_reason={LAST_FINISH_REASON}, reply_chars={len(text)}, head={text[:200]!r})"
+            if not text.strip() or LAST_FINISH_REASON == "length":
+                budget = min(budget * 2, 16000)   # ran out of tokens: give it more room
+                continue
             messages = messages + [{"role": "assistant", "content": text[:4000]},
-                                   {"role": "user", "content": "That was not valid JSON. Reply with ONLY the JSON object."}]
+                                   {"role": "user", "content": "That was not valid JSON. Reply with ONLY the JSON object, no prose, no code fences."}]
     raise APIError(f"script model did not return JSON: {last_err}")
 
 

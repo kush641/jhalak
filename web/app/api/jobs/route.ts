@@ -12,7 +12,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const payload = await req.json();
-  if (!payload?.drive_url) return NextResponse.json({ error: "Add a Google Drive link" }, { status: 400 });
+  if (!payload?.drive_url && !payload?.upload_id) return NextResponse.json({ error: "Add a Google Drive link or upload videos" }, { status: 400 });
   try {
     const r = await callWorker("/jobs", { method: "POST", body: JSON.stringify(payload) });
     return NextResponse.json(r.body, { status: r.status });

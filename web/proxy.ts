@@ -20,5 +20,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/studio/:path*", "/api/jobs/:path*", "/api/worker-url"],
+  matcher: ["/studio/:path*", "/api/jobs/:path*", "/api/worker-url", "/api/upload-token"],
 };

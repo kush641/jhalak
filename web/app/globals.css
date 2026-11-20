@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #07070c;
+  --surface: #10101a;
+  --surface-2: #161624;
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #f4f4f8;
+  --muted: rgba(244, 244, 248, 0.62);
+  --blue: #2e6bff;
+  --violet: #8b5cf6;
+  --orange: #ff7a2e;
+  --grad: linear-gradient(100deg, var(--blue) 0%, var(--violet) 50%, var(--orange) 100%);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.grad-text {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.grad-bg {
+  background: var(--grad);
+}
+
+.grad-border {
+  border: 1px solid transparent;
+  background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--grad) border-box;
+}
+
+.btn-primary {
+  background: var(--grad);
+  color: white;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.75rem 1.4rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
+  box-shadow: 0 8px 30px -10px rgba(139, 92, 246, 0.7);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  transform: none;
+}
+
+.btn-ghost {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.7rem 1.3rem;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+}
+
+.input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  color: var(--text);
+  outline: none;
+  font-size: 0.95rem;
+}
+.input:focus {
+  border-color: rgba(139, 92, 246, 0.7);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+select.input {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #aaa 50%), linear-gradient(135deg, #aaa 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.label {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.glow {
+  position: absolute;
+  inset: auto;
+  filter: blur(90px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+@keyframes playhead {
+  from {
+    left: 0%;
+  }
+  to {
+    left: 100%;
+  }
+}
+.playhead {
+  animation: playhead 9s linear infinite;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.pulse-soft {
+  animation: pulse-soft 2.2s ease-in-out infinite;
+}
